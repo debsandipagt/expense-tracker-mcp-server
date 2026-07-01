@@ -4,7 +4,7 @@ import sqlite3
 # from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Body
-# from pydantic import BaseModel
+from pydantic import BaseModel
 
 #-------------------------------------------------------------
 #Paths
@@ -42,25 +42,21 @@ init_db()
 # Pydantic Model
 #--------------------------------------------------------------
 
-# class Expenses(BaseModel):
-#     date: str
-#     amount: float
-#     category: str
-#     subcategory: str = ""
-#     note: str = ""
+from pydantic import BaseModel
+
+class Expenses(BaseModel):
+    date: str
+    amount: float
+    category: str
+    subcategory: str = ""
+    note: str = ""
 
 #-------------------------------------------------------------
 # Add expenses
 #-------------------------------------------------------------
-
 @app.post("/expenses")
-def add_expenses(
-    date: str = Body(..., description="Expense date (YYYY-MM-DD)"),
-    amount: float = Body(..., description="Expense amount"),
-    category: str = Body(..., description="Expense category"),
-    subcategory: str = Body("", description="Expense subcategory"),
-    note: str = Body("", description="Additional note"),
-):
+def add_expenses(expenses: Expenses):
+
     with sqlite3.connect(DB_PATH) as conn:
 
         cur = conn.execute(
@@ -70,11 +66,11 @@ def add_expenses(
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                date,
-                amount,
-                category,
-                subcategory,
-                note,
+                expenses.date,
+                expenses.amount,
+                expenses.category,
+                expenses.subcategory,
+                expenses.note,
             ),
         )
 
@@ -83,17 +79,8 @@ def add_expenses(
     return {
         "status": "success",
         "id": cur.lastrowid,
+        "message": "Expense added successfully",
     }
-
-@app.get("/expenses")
-def get_expenses():
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute(
-            "SELECT id, date, amount, category, subcategory, note FROM expenses ORDER BY id ASC"
-            )
-        cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, r)) for r in cur.fetchall()]
-
 @app.get("/expenses/date-range")
 def expenses_between_dates(
     start_date: str,
