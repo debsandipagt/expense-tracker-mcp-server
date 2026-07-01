@@ -1,10 +1,10 @@
 import os
 import json
 import sqlite3
-from typing import Optional
+# from typing import Optional
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Body
+# from pydantic import BaseModel
 
 #-------------------------------------------------------------
 #Paths
@@ -42,20 +42,27 @@ init_db()
 # Pydantic Model
 #--------------------------------------------------------------
 
-class Expenses(BaseModel):
-    date: str
-    amount: float
-    category: str
-    subcategory: str = ""
-    note: str = ""
+# class Expenses(BaseModel):
+#     date: str
+#     amount: float
+#     category: str
+#     subcategory: str = ""
+#     note: str = ""
 
 #-------------------------------------------------------------
 # Add expenses
 #-------------------------------------------------------------
 
 @app.post("/expenses")
-def add_expenses(expenses: Expenses):
+def add_expenses(
+    date: str = Body(..., description="Expense date (YYYY-MM-DD)"),
+    amount: float = Body(..., description="Expense amount"),
+    category: str = Body(..., description="Expense category"),
+    subcategory: str = Body("", description="Expense subcategory"),
+    note: str = Body("", description="Additional note"),
+):
     with sqlite3.connect(DB_PATH) as conn:
+
         cur = conn.execute(
             """
             INSERT INTO expenses
@@ -63,15 +70,20 @@ def add_expenses(expenses: Expenses):
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                expenses.date,
-                expenses.amount,
-                expenses.category,
-                expenses.subcategory,   
-                expenses.note
-            )
+                date,
+                amount,
+                category,
+                subcategory,
+                note,
+            ),
         )
 
-    return {"status": "success", "id": cur.lastrowid}
+        conn.commit()
+
+    return {
+        "status": "success",
+        "id": cur.lastrowid,
+    }
 
 @app.get("/expenses")
 def get_expenses():
