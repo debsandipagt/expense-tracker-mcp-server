@@ -1,0 +1,159 @@
+{
+  "Food": [
+    "Groceries",
+    "Restaurants",
+    "Fast Food",
+    "Cafe",
+    "Snacks",
+    "Bakery",
+    "Food Delivery",
+    "Beverages"
+  ],
+  "Transportation": [
+    "Fuel",
+    "Public Transport",
+    "Taxi",
+    "Ride Sharing",
+    "Parking",
+    "Tolls",
+    "Vehicle Maintenance",
+    "Vehicle Insurance"
+  ],
+  "Housing": [
+    "Rent",
+    "Mortgage",
+    "Electricity",
+    "Water",
+    "Gas",
+    "Internet",
+    "Home Maintenance",
+    "Furniture"
+  ],
+  "Utilities": [
+    "Electricity",
+    "Water",
+    "Gas",
+    "Internet",
+    "Mobile Recharge",
+    "Telephone",
+    "Streaming Services"
+  ],
+  "Healthcare": [
+    "Doctor",
+    "Hospital",
+    "Medicines",
+    "Dental",
+    "Vision",
+    "Health Insurance",
+    "Lab Tests"
+  ],
+  "Education": [
+    "Tuition",
+    "Books",
+    "Online Courses",
+    "Certifications",
+    "Stationery",
+    "Exam Fees"
+  ],
+  "Shopping": [
+    "Clothing",
+    "Shoes",
+    "Accessories",
+    "Electronics",
+    "Home Appliances",
+    "Personal Care",
+    "Gifts"
+  ],
+  "Entertainment": [
+    "Movies",
+    "Music",
+    "Games",
+    "Events",
+    "Sports",
+    "Hobbies",
+    "Subscriptions"
+  ],
+  "Travel": [
+    "Flights",
+    "Train",
+    "Bus",
+    "Hotel",
+    "Accommodation",
+    "Visa",
+    "Travel Insurance",
+    "Sightseeing"
+  ],
+  "Insurance": [
+    "Health",
+    "Life",
+    "Vehicle",
+    "Home",
+    "Travel"
+  ],
+  "Financial": [
+    "Bank Charges",
+    "Loan EMI",
+    "Credit Card Payment",
+    "Investment",
+    "Mutual Funds",
+    "Stocks",
+    "Taxes"
+  ],
+  "Family": [
+    "Child Care",
+    "School Fees",
+    "Pocket Money",
+    "Parents",
+    "Baby Products"
+  ],
+  "Personal Care": [
+    "Haircut",
+    "Salon",
+    "Cosmetics",
+    "Gym",
+    "Spa",
+    "Skincare"
+  ],
+  "Pets": [
+    "Pet Food",
+    "Veterinary",
+    "Grooming",
+    "Pet Toys"
+  ],
+  "Work": [
+    "Office Supplies",
+    "Software",
+    "Laptop",
+    "Accessories",
+    "Business Travel",
+    "Training"
+  ],
+  "Donations": [
+    "Charity",
+    "Religious",
+    "NGO",
+    "Crowdfunding"
+  ],
+  "Taxes": [
+    "Income Tax",
+    "Property Tax",
+    "Road Tax",
+    "GST",
+    "Professional Tax"
+  ],
+  "Bills": [
+    "Electric Bill",
+    "Water Bill",
+    "Gas Bill",
+    "Internet Bill",
+    "Mobile Bill",
+    "Credit Card Bill"
+  ],
+  "Miscellaneous": [
+    "Unexpected",
+    "Emergency",
+    "Fine",
+    "Penalty",
+    "Other"
+  ]
+}
