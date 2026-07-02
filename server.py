@@ -1,7 +1,11 @@
 import os
+import libsql_client
 import asyncio
 import aiosqlite
 from fastmcp import FastMCP
+
+TURSO_AUTH_TOKEN = os.environ["TURSO_AUTH_TOKEN"]
+TURSO_DATABASE_URL = os.environ["TURSO_DATABASE_URL"]
 
 mcp = FastMCP(
     name="Expense Tracker Server",
@@ -28,8 +32,8 @@ CATEGORIES_PATH = os.path.join(BASE_DIR, "categories.json")
 
 async def init_db():
     """Create the expenses table if it does not already exist."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+    async with libsql_client.create_client(url=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN) as client:
+        await client.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL,
@@ -39,7 +43,7 @@ async def init_db():
                 note TEXT DEFAULT ''
             )
         """)
-        await db.commit()
+        await client.commit()
 
 
 @mcp.tool()
