@@ -99,49 +99,32 @@ def expenses_between_dates(
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, r)) for r in cur.fetchall()]
     
-@app.get("/summary")
-def summarize(
-    start_date: str,
-    end_date: str,
-    category: Optional[str] = None,
-):
-
-    query = """
-        SELECT
-            category,
-            SUM(amount) AS total_amount
-        FROM expenses
-        WHERE date BETWEEN ? AND ?
-    """
-
-    params = [start_date, end_date]
-
-    if category:
-        query += " AND category = ?"
-        params.append(category)
-
-    query += """
-        GROUP BY category
-        ORDER BY category
-    """
-
+@app.get("/expenses/summary")
+def summarize(category: str = None):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
 
-        rows = conn.execute(query, params).fetchall()
+        if category:
+            cursor = conn.execute(
+                """
+                SELECT category,
+                       COUNT(*) AS total_entries,
+                       COALESCE(SUM(amount), 0) AS total_amount
+                FROM expenses
+                WHERE category = ?
+                GROUP BY category
+                """,
+                (category,),
+            )
+        else:
+            cursor = conn.execute(
+                """
+                SELECT category,
+                       COUNT(*) AS total_entries,
+                       COALESCE(SUM(amount), 0) AS total_amount
+                FROM expenses
+                GROUP BY category
+                """
+            )
 
-    return [dict(row) for row in rows]
-
-
-# --------------------------------------------------
-# Categories
-# --------------------------------------------------
-
-@app.get("/categories")
-def categories():
-
-    if not os.path.exists(CATEGORIES_PATH):
-        raise HTTPException(404, "categories.json not found")
-
-    with open(CATEGORIES_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        return [dict(row) for row in cursor.fetchall()]
