@@ -1,11 +1,7 @@
 import os
-import libsql_client
 import asyncio
-import aiosqlite
+import libsql_client
 from fastmcp import FastMCP
-
-TURSO_AUTH_TOKEN = os.environ["TURSO_AUTH_TOKEN"]
-TURSO_DATABASE_URL = os.environ["TURSO_DATABASE_URL"]
 
 mcp = FastMCP(
     name="Expense Tracker Server",
@@ -21,18 +17,33 @@ mcp = FastMCP(
     """
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Cloud/container-safe writable location.
-# You can override this using an environment variable.
-DB_PATH = os.environ.get("DB_PATH", "/tmp/expenses.db")
-
+BASE_DIR = os.path.dirname(__file__)
 CATEGORIES_PATH = os.path.join(BASE_DIR, "categories.json")
+
+# Turso (libSQL) connection details — set these as environment variables
+# in FastMCP Cloud's project settings, NOT hardcoded here.
+# TURSO_DATABASE_URL looks like: libsql://your-db-name.turso.io
+# TURSO_AUTH_TOKEN is the token from `turso db tokens create <db-name>`
+TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN")
+
+
+def get_client() -> libsql_client.Client:
+    """Create a new libsql client for a single operation."""
+    if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
+        raise RuntimeError(
+            "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set as environment "
+            "variables. Set them in FastMCP Cloud's project settings."
+        )
+    return libsql_client.create_client(
+        url=TURSO_DATABASE_URL,
+        auth_token=TURSO_AUTH_TOKEN,
+    )
 
 
 async def init_db():
-    """Create the expenses table if it does not already exist."""
-    async with libsql_client.create_client(url=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN) as client:
+    """Create the expenses table in Turso if it does not already exist."""
+    async with get_client() as client:
         await client.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +54,6 @@ async def init_db():
                 note TEXT DEFAULT ''
             )
         """)
-        await client.commit()
 
 
 @mcp.tool()
@@ -55,46 +65,41 @@ async def add_expense(
     note: str = ""
 ) -> dict:
     """
-    Add a new expense record.
+    Add a new expense record to the expense tracker.
+
+    Use this tool when the user wants to record spending, payment, purchase,
+    bill, travel cost, food expense, shopping expense, or any other outgoing amount.
 
     Args:
-        date: Expense date in YYYY-MM-DD format.
-        amount: Expense amount as a positive number.
-        category: Main expense category.
-        subcategory: Optional detailed category.
-        note: Optional description of the expense.
+        date: Expense date in YYYY-MM-DD format. Example: 2026-07-02.
+        amount: Expense amount as a positive number. Example: 250.50.
+        category: Main expense category. Example: Food, Travel, Shopping, Bills.
+        subcategory: Optional detailed category. Example: Lunch, Taxi, Electricity.
+        note: Optional description of the expense. Example: Lunch with colleagues.
+
+    Returns:
+        A success response with the generated expense ID, or an error response.
     """
     try:
-        # Important: ensures the table exists in cloud deployments.
-        await init_db()
-
-        if amount <= 0:
-            return {
-                "status": "error",
-                "message": "Amount must be greater than zero."
-            }
-
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
+        async with get_client() as client:
+            result = await client.execute(
                 """
                 INSERT INTO expenses (date, amount, category, subcategory, note)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (date, amount, category, subcategory, note)
+                [date, amount, category, subcategory, note]
             )
-            await db.commit()
 
             return {
                 "status": "success",
                 "message": "Expense added successfully.",
-                "expense_id": cursor.lastrowid
+                "expense_id": result.last_insert_rowid
             }
 
     except Exception as error:
         return {
             "status": "error",
-            "message": f"Could not add expense: {error}",
-            "database_path": DB_PATH
+            "message": f"Could not add expense: {error}"
         }
 
 
@@ -102,20 +107,24 @@ async def add_expense(
 async def list_expenses() -> list[dict]:
     """
     Retrieve all saved expenses from newest to oldest.
+
+    Use this tool when the user wants to view, review, check, or list
+    their expense history.
+
+    Returns:
+        A list of expense records containing ID, date, amount, category,
+        subcategory, and note. Returns an empty list if no expenses exist.
     """
-    # Important: ensures the table exists before SELECT runs.
-    await init_db()
-
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-
-        async with db.execute("""
+    async with get_client() as client:
+        result = await client.execute("""
             SELECT id, date, amount, category, subcategory, note
             FROM expenses
             ORDER BY id DESC
-        """) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+        """)
+        return [
+            dict(zip(result.columns, row))
+            for row in result.rows
+        ]
 
 
 if __name__ == "__main__":
