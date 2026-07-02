@@ -17,10 +17,16 @@ mcp = FastMCP(
     """
 )
 
-# Local: creates expenses.db beside this file
-# Docker / Cloud Run: set DB_PATH=/tmp/expenses.db
+# BASE_DIR is where this script lives. On most cloud/container platforms
+# (Docker, Cloud Run, FastMCP Cloud, etc.) this directory is deployed
+# read-only, so we can't write new data there.
 BASE_DIR = os.path.dirname(__file__)
-DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "expenses.db"))
+
+# /tmp (or DB_PATH if explicitly set) is writable in virtually all
+# containerized/serverless environments. Note: it's ephemeral — wiped on
+# restart/redeploy, and not shared across multiple instances.
+DB_PATH = os.environ.get("DB_PATH", "/tmp/expenses.db")
+
 CATEGORIES_PATH = os.path.join(BASE_DIR, "categories.json")
 
 
