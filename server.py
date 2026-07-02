@@ -114,4 +114,5 @@ async def list_expenses() -> list[dict]:
 
 
 if __name__ == "__main__":
+    asyncio.run(init_db())
     mcp.run(transport="http", host="0.0.0.0", port=8000)
