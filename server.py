@@ -17,14 +17,10 @@ mcp = FastMCP(
     """
 )
 
-# BASE_DIR is where this script lives. On most cloud/container platforms
-# (Docker, Cloud Run, FastMCP Cloud, etc.) this directory is deployed
-# read-only, so we can't write new data there.
-BASE_DIR = os.path.dirname(__file__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# /tmp (or DB_PATH if explicitly set) is writable in virtually all
-# containerized/serverless environments. Note: it's ephemeral — wiped on
-# restart/redeploy, and not shared across multiple instances.
+# Cloud/container-safe writable location.
+# You can override this using an environment variable.
 DB_PATH = os.environ.get("DB_PATH", "/tmp/expenses.db")
 
 CATEGORIES_PATH = os.path.join(BASE_DIR, "categories.json")
@@ -55,22 +51,25 @@ async def add_expense(
     note: str = ""
 ) -> dict:
     """
-    Add a new expense record to the expense tracker.
-
-    Use this tool when the user wants to record spending, payment, purchase,
-    bill, travel cost, food expense, shopping expense, or any other outgoing amount.
+    Add a new expense record.
 
     Args:
-        date: Expense date in YYYY-MM-DD format. Example: 2026-07-02.
-        amount: Expense amount as a positive number. Example: 250.50.
-        category: Main expense category. Example: Food, Travel, Shopping, Bills.
-        subcategory: Optional detailed category. Example: Lunch, Taxi, Electricity.
-        note: Optional description of the expense. Example: Lunch with colleagues.
-
-    Returns:
-        A success response with the generated expense ID, or an error response.
+        date: Expense date in YYYY-MM-DD format.
+        amount: Expense amount as a positive number.
+        category: Main expense category.
+        subcategory: Optional detailed category.
+        note: Optional description of the expense.
     """
     try:
+        # Important: ensures the table exists in cloud deployments.
+        await init_db()
+
+        if amount <= 0:
+            return {
+                "status": "error",
+                "message": "Amount must be greater than zero."
+            }
+
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute(
                 """
@@ -99,14 +98,10 @@ async def add_expense(
 async def list_expenses() -> list[dict]:
     """
     Retrieve all saved expenses from newest to oldest.
-
-    Use this tool when the user wants to view, review, check, or list
-    their expense history.
-
-    Returns:
-        A list of expense records containing ID, date, amount, category,
-        subcategory, and note. Returns an empty list if no expenses exist.
     """
+    # Important: ensures the table exists before SELECT runs.
+    await init_db()
+
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
 
