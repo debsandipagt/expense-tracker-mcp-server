@@ -1,42 +1,142 @@
 # Expense Tracker MCP Server — Dev Log
 
 ## Setup
+
 1. `pip install uv` — install the uv package/project manager.
 2. `uv init .` — initialize a new uv project in the current directory.
 3. `uv add fastmcp` — install FastMCP (via uv instead of pip).
+4. `uv sync` — install/lock all project dependencies from `pyproject.toml`.
+5. `uv add fastapi uvicorn pydantic` — add FastAPI, Uvicorn, and Pydantic to the existing uv project.(Optional)
+6. `uv add python-dotenv` — load environment variables from the local `.env` file.
+7. `uv add asyncpg` — add the asynchronous PostgreSQL driver.
 
 ## Local Development & Testing
-4. `uv run fastmcp dev inspector main.py` — launch the MCP Inspector to test the server interactively.
-5. `uv run python server.py` — run the FastMCP server directly.
+
+4. `uv run python server.py` — run the FastMCP server directly.
+
+5. `uv run fastmcp dev inspector server.py` or `npx @modelcontextprotocol/inspector` (when the server is running) — launch the MCP Inspector to test the server interactively.
+
+6. Connect to the local MCP server using:
+
+```text
+http://localhost:8000/mcp
+```
+
+7. In MCP Inspector, select **Streamable HTTP** transport and test:
+
+   * `add_expense`
+   * `list_expenses`
 
 ## Structuring Tool Inputs
-6. Create a `categories.json` file to define a fixed set of expense categories, so Claude is constrained to use consistent, structured category values instead of free text.
+
+8. Create a `categories.json` file to define a fixed set of expense categories, so Claude is constrained to use consistent, structured category values instead of free text.
 
 ## API Design
-7. Prototype a REST API for travel expenses using FastAPI, and test it in `app.py`.
-8. Convert the working REST API logic into MCP tools inside `server.py` (i.e., wrap the same logic as `@mcp.tool()` functions instead of FastAPI routes).
 
-## Dependencies
-9. `uv sync` — install/lock all project dependencies from `pyproject.toml`.
-10. `uv add fastapi uvicorn pydantic` — add FastAPI, Uvicorn, and Pydantic to the existing uv project.
+9. Prototype a REST API for travel expenses using FastAPI, and test it in `app.py`.
+
+10. Convert the working REST API logic into MCP tools inside `server.py` (i.e., wrap the same logic as `@mcp.tool()` functions instead of FastAPI routes).
 
 ## Database & Deployment Fixes
-11. **Diagnosed "attempt to write a readonly database" error** on FastMCP Cloud — traced to `DB_PATH` defaulting to `BASE_DIR` (the script's own directory), which is deployed as a **read-only** bundle in most container/serverless platforms.
-12. **Fixed by pointing `DB_PATH` at `/tmp/expenses.db`**:
+
+15. **Diagnosed "attempt to write a readonly database" error** on FastMCP Cloud — traced to `DB_PATH` defaulting to `BASE_DIR` (the script's own directory), which is deployed as a **read-only** bundle in most container/serverless platforms.
+
+16. **Fixed by pointing `DB_PATH` at `/tmp/expenses.db`**:
+
 ```python
-    DB_PATH = os.environ.get("DB_PATH", "/tmp/expenses.db")
+DB_PATH = os.environ.get("DB_PATH", "/tmp/expenses.db")
 ```
-    `/tmp` is writable in virtually all containerized environments, since platforms mount it as a separate writable layer even when the rest of the filesystem is locked.
-13. **Removed bundled-DB seeding logic** — server now starts fresh against `/tmp/expenses.db` every deploy, rather than copying over old data from the read-only bundle.
-14. **Note on ephemeral storage**: `/tmp` is wiped on every restart/redeploy and isn't shared across multiple instances — fine for testing, not a long-term data store. Future improvement: move to a persistent volume or external DB (e.g., Turso/Postgres) if data needs to survive redeploys.
-15. **Debugged local Windows port conflict** (`WinError 10048`) — caused by a leftover process still bound to port 8000 from a previous `fastmcp dev inspector` session. Resolved via:
+
+`/tmp` is writable in virtually all containerized environments, since platforms mount it as a separate writable layer even when the rest of the filesystem is locked.
+
+17. **Removed bundled-DB seeding logic** — server now starts fresh against `/tmp/expenses.db` every deploy, rather than copying over old data from the read-only bundle.
+
+18. **Note on ephemeral storage**: `/tmp` is wiped on every restart/redeploy and is not shared across multiple instances — fine for testing, not a long-term data store.
+
+19. **Debugged local Windows port conflict** (`WinError 10048`) — caused by a leftover process still bound to port 8000 from a previous `fastmcp dev inspector` session. Resolved via:
+
 ```powershell
-    netstat -ano | findstr :8000
-    taskkill /PID <pid> /F
+netstat -ano | findstr :8000
+taskkill /PID <pid> /F
 ```
-16. **Confirmed end-to-end via `add_expense` / `list_expenses`** through the deployed FastMCP Cloud connector — verified writes and reads both work against the corrected `/tmp` path.
+
+20. **Confirmed end-to-end via `add_expense` / `list_expenses`** through the deployed FastMCP Cloud connector — verified writes and reads both work against the corrected `/tmp` path.
+
+21. **Tried Turso/libSQL for persistent cloud storage** — configured `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`, but encountered:
+
+```text
+WSServerHandshakeError: 400 Invalid response status
+```
+
+22. **Tried the newer `libsql` package** — installation failed on Windows because it required Rust/Cargo native compilation and encountered a permission-denied build error.
+
+23. **Migrated from SQLite/Turso to Neon PostgreSQL** for persistent cloud storage.
+
+24. Installed PostgreSQL dependencies:
+
+```bash
+uv remove libsql-client
+uv add asyncpg python-dotenv
+uv sync
+```
+
+25. Added the Neon PostgreSQL connection string to local `.env`:
+
+```env
+DATABASE_URL=postgresql://username:password@host/database?sslmode=require
+```
+
+26. Added the same `DATABASE_URL` environment variable in FastMCP Cloud for deployment.
+
+27. Replaced Turso `libsql_client` code with `asyncpg` PostgreSQL connection code:
+
+```python
+async def get_connection():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL must be set.")
+    return await asyncpg.connect(DATABASE_URL)
+```
+
+28. Created the PostgreSQL `expenses` table automatically during server startup:
+
+```python
+asyncio.run(init_db())
+```
+
+29. PostgreSQL table structure:
+
+```sql
+CREATE TABLE IF NOT EXISTS expenses (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    date DATE NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+    category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(100) DEFAULT '',
+    note TEXT DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+30. Updated database query placeholders from SQLite `?` to PostgreSQL `asyncpg` placeholders `$1`, `$2`, `$3`, `$4`, and `$5`.
+
+31. **Verified Neon PostgreSQL integration locally** — `uv run python server.py` starts successfully, creates the `expenses` table, and connects to the Neon database.
+
+32. **Verified inserted records in Neon SQL Editor**:
+
+```sql
+SELECT *
+FROM expenses
+ORDER BY created_at DESC;
+```
+
+33. Added `.env` to `.gitignore` so database credentials are not committed:
+
+```gitignore
+.env
+```
 
 ## Git Workflow (reference)
+
 ```powershell
 git add .
 git commit -m "message"
