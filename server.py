@@ -150,6 +150,58 @@ async def list_expenses() -> list[dict]:
     finally:
         await conn.close()
 
+@mcp.tool()
+async def delete_expense(expense_id: int) -> dict:
+    """
+    Delete an expense from the expense tracker.
+
+    Args:
+        expense_id: ID of the expense to delete.
+
+    Returns:
+        Success or error response.
+    """
+    if expense_id <= 0:
+        return {
+            "status": "error",
+            "message": "Expense ID must be greater than zero."
+        }
+
+    conn = await get_connection()
+
+    try:
+        result = await conn.execute(
+            """
+            DELETE FROM expenses
+            WHERE id = $1
+            """,
+            expense_id,
+        )
+
+        # asyncpg returns strings like "DELETE 1" or "DELETE 0"
+        deleted_rows = int(result.split()[-1])
+
+        if deleted_rows == 0:
+            return {
+                "status": "error",
+                "message": f"No expense found with ID {expense_id}."
+            }
+
+        return {
+            "status": "success",
+            "message": "Expense deleted successfully.",
+            "expense_id": expense_id
+        }
+
+    except Exception as error:
+        return {
+            "status": "error",
+            "message": f"Could not delete expense: {error}"
+        }
+
+    finally:
+        await conn.close()
+
 
 if __name__ == "__main__":
     asyncio.run(init_db())
