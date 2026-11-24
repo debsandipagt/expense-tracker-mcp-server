@@ -19,7 +19,7 @@
 6. Connect to the local MCP server using:
 
 ```text
-http://localhost:8000/mcp
+https://expense-tracker-mcp-app.fastmcp.app/mcp
 ```
 
 7. In MCP Inspector, select **Streamable HTTP** transport and test:
